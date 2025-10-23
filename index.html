@@ -98,6 +98,61 @@
             display: none;
         }
 
+        .search-section {
+            margin-bottom: 40px;
+            animation: fadeIn 0.8s ease;
+            display: none;
+        }
+
+        .search-container {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 50px;
+            padding: 8px 25px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            max-width: 700px;
+            margin: 0 auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .search-container:focus-within {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-icon {
+            font-size: 1.3em;
+            opacity: 0.8;
+        }
+
+        #searchInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            font-size: 1.1em;
+            padding: 12px 0;
+            font-weight: 300;
+        }
+
+        #searchInput::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .search-results-count {
+            font-size: 0.9em;
+            padding: 6px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -118,6 +173,10 @@
         .pdf-card:hover {
             transform: translateY(-10px);
             box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        .pdf-card.hidden {
+            display: none;
         }
 
         .pdf-preview {
@@ -311,6 +370,14 @@
             </div>
         </div>
 
+        <div class="search-section" id="searchSection">
+            <div class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Buscar texto dentro de los PDFs..." />
+                <span class="search-results-count" id="resultsCount"></span>
+            </div>
+        </div>
+
         <div class="grid" id="pdfGrid"></div>
 
         <div class="empty-state" id="emptyState">
@@ -345,10 +412,14 @@
         const prevPageBtn = document.getElementById('prevPage');
         const nextPageBtn = document.getElementById('nextPage');
         const pageInfo = document.getElementById('pageInfo');
+        const searchSection = document.getElementById('searchSection');
+        const searchInput = document.getElementById('searchInput');
+        const resultsCount = document.getElementById('resultsCount');
 
         let pdfs = [];
         let currentPdf = null;
         let currentPage = 1;
+        let pdfTexts = [];
 
         uploadArea.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', handleFiles);
@@ -375,22 +446,77 @@
                 if (file.type === 'application/pdf') {
                     const reader = new FileReader();
                     reader.onload = async function(event) {
-                        const typedArray = new Uint8Array(event.target.result);
-                        const pdf = await pdfjsLib.getDocument(typedArray).promise;
-                        
-                        pdfs.push({
-                            name: file.name,
-                            pdf: pdf,
-                            data: typedArray
-                        });
-                        
-                        renderGrid();
+                        try {
+                            const typedArray = new Uint8Array(event.target.result);
+                            const pdf = await pdfjsLib.getDocument({data: typedArray}).promise;
+                            
+                            // Extraer texto de todas las páginas
+                            let fullText = '';
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                                try {
+                                    const page = await pdf.getPage(i);
+                                    const textContent = await page.getTextContent();
+                                    const pageText = textContent.items.map(item => item.str).join(' ');
+                                    fullText += pageText + ' ';
+                                } catch (err) {
+                                    console.log('Error extrayendo texto de página:', i, err);
+                                }
+                            }
+                            
+                            pdfs.push({
+                                name: file.name,
+                                pdf: pdf,
+                                data: typedArray
+                            });
+                            
+                            pdfTexts.push(fullText);
+                            
+                            await renderGrid();
+                            searchSection.style.display = 'block';
+                        } catch (error) {
+                            console.error('Error procesando PDF:', error);
+                        }
                     };
                     reader.readAsArrayBuffer(file);
                 }
             }
             
             fileInput.value = '';
+        }
+
+        searchInput.addEventListener('input', filterPDFs);
+
+        function filterPDFs() {
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            
+            if (searchTerm === '') {
+                document.querySelectorAll('.pdf-card').forEach(card => {
+                    card.classList.remove('hidden');
+                });
+                resultsCount.textContent = '';
+                return;
+            }
+            
+            let visibleCount = 0;
+            const cards = document.querySelectorAll('.pdf-card');
+            
+            cards.forEach((card, index) => {
+                const text = pdfTexts[index].toLowerCase();
+                if (text.includes(searchTerm)) {
+                    card.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+            
+            if (visibleCount === 0) {
+                resultsCount.textContent = 'Sin resultados';
+            } else if (visibleCount === 1) {
+                resultsCount.textContent = '1 resultado';
+            } else {
+                resultsCount.textContent = `${visibleCount} resultados`;
+            }
         }
 
         async function renderGrid() {
@@ -405,21 +531,26 @@
                 const preview = document.createElement('div');
                 preview.className = 'pdf-preview';
                 
-                const canvas = document.createElement('canvas');
-                const page = await pdfData.pdf.getPage(1);
-                const viewport = page.getViewport({ scale: 1 });
-                const scale = 280 / viewport.width;
-                const scaledViewport = page.getViewport({ scale });
-                
-                canvas.width = scaledViewport.width;
-                canvas.height = scaledViewport.height;
-                
-                await page.render({
-                    canvasContext: canvas.getContext('2d'),
-                    viewport: scaledViewport
-                }).promise;
-                
-                preview.appendChild(canvas);
+                try {
+                    const canvas = document.createElement('canvas');
+                    const page = await pdfData.pdf.getPage(1);
+                    const viewport = page.getViewport({ scale: 1 });
+                    const scale = 280 / viewport.width;
+                    const scaledViewport = page.getViewport({ scale });
+                    
+                    canvas.width = scaledViewport.width;
+                    canvas.height = scaledViewport.height;
+                    
+                    await page.render({
+                        canvasContext: canvas.getContext('2d'),
+                        viewport: scaledViewport
+                    }).promise;
+                    
+                    preview.appendChild(canvas);
+                } catch (error) {
+                    console.error('Error renderizando preview:', error);
+                    preview.innerHTML = '<div style="color: #666;">Error al cargar vista previa</div>';
+                }
                 
                 const info = document.createElement('div');
                 info.className = 'pdf-info';
@@ -445,20 +576,24 @@
         }
 
         async function renderModalPage() {
-            const page = await currentPdf.getPage(currentPage);
-            const viewport = page.getViewport({ scale: 2 });
-            
-            modalCanvas.width = viewport.width;
-            modalCanvas.height = viewport.height;
-            
-            await page.render({
-                canvasContext: modalCanvas.getContext('2d'),
-                viewport: viewport
-            }).promise;
-            
-            pageInfo.textContent = `Página ${currentPage} de ${currentPdf.numPages}`;
-            prevPageBtn.disabled = currentPage === 1;
-            nextPageBtn.disabled = currentPage === currentPdf.numPages;
+            try {
+                const page = await currentPdf.getPage(currentPage);
+                const viewport = page.getViewport({ scale: 2 });
+                
+                modalCanvas.width = viewport.width;
+                modalCanvas.height = viewport.height;
+                
+                await page.render({
+                    canvasContext: modalCanvas.getContext('2d'),
+                    viewport: viewport
+                }).promise;
+                
+                pageInfo.textContent = `Página ${currentPage} de ${currentPdf.numPages}`;
+                prevPageBtn.disabled = currentPage === 1;
+                nextPageBtn.disabled = currentPage === currentPdf.numPages;
+            } catch (error) {
+                console.error('Error renderizando página:', error);
+            }
         }
 
         closeBtn.addEventListener('click', () => {
