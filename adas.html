@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Usuarios</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        h1 {
+            color: #2c3e50;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #3498db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .user-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .upload-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .upload-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .upload-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .pdfs-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .pdf-item {
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s;
+        }
+        
+        .pdf-item:hover {
+            transform: translateY(-5px);
+        }
+        
+        .pdf-thumbnail {
+            width: 100%;
+            height: 150px;
+            background-color: #ecf0f1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .pdf-icon {
+            font-size: 48px;
+            color: #e74c3c;
+        }
+        
+        .pdf-name {
+            padding: 10px;
+            font-size: 14px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .user-buttons {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .user-btn {
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.3s;
+        }
+        
+        .user-btn:disabled {
+            cursor: not-allowed;
+        }
+        
+        .user-btn.mariela {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .user-btn.mariela:hover:not(:disabled) {
+            background-color: #c0392b;
+        }
+        
+        .user-btn.carlos {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .user-btn.esteban {
+            background-color: #9b59b6;
+            color: white;
+        }
+        
+        .user-btn.javier {
+            background-color: #f39c12;
+            color: white;
+        }
+        
+        .user-btn.approved {
+            background-color: #2ecc71 !important;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow: auto;
+            position: relative;
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #7f8c8d;
+        }
+        
+        .pdf-viewer {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+        
+        .modal-title {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .no-pdfs {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Panel de Usuarios</h1>
+            <div class="user-info">
+                <div class="user-avatar" id="current-user-avatar">M</div>
+                <div class="user-name" id="current-user-name">Mariela</div>
+            </div>
+        </header>
+        
+        <div class="upload-section" id="upload-section">
+            <input type="file" id="pdf-upload" accept=".pdf" class="hidden">
+            <button class="upload-btn" id="upload-btn">Subir PDF</button>
+        </div>
+        
+        <div id="pdfs-container" class="pdfs-container">
+            <!-- Los PDFs se mostrarán aquí -->
+        </div>
+        
+        <div id="no-pdfs" class="no-pdfs">
+            <p>No hay PDFs disponibles. Mariela puede subir el primer PDF.</p>
+        </div>
+    </div>
+    
+    <div id="pdf-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-title" id="modal-title">Vista de PDF</div>
+            <button class="close-btn" id="close-modal">&times;</button>
+            <iframe id="pdf-viewer" class="pdf-viewer" src=""></iframe>
+        </div>
+    </div>
+
+    <script>
+        // Estado de la aplicación
+        const state = {
+            currentUser: 'mariela',
+            pdfs: [
+                {
+                    id: 1,
+                    name: 'Documento 1.pdf',
+                    approvedBy: ['mariela']
+                },
+                {
+                    id: 2,
+                    name: 'Informe Mensual.pdf',
+                    approvedBy: ['mariela', 'carlos']
+                },
+                {
+                    id: 3,
+                    name: 'Presentación.pdf',
+                    approvedBy: []
+                }
+            ]
+        };
+
+        // Elementos del DOM
+        const currentUserAvatar = document.getElementById('current-user-avatar');
+        const currentUserName = document.getElementById('current-user-name');
+        const uploadSection = document.getElementById('upload-section');
+        const uploadBtn = document.getElementById('upload-btn');
+        const pdfUpload = document.getElementById('pdf-upload');
+        const pdfsContainer = document.getElementById('pdfs-container');
+        const noPdfs = document.getElementById('no-pdfs');
+        const pdfModal = document.getElementById('pdf-modal');
+        const pdfViewer = document.getElementById('pdf-viewer');
+        const closeModal = document.getElementById('close-modal');
+        const modalTitle = document.getElementById('modal-title');
+
+        // Inicializar la aplicación
+        function init() {
+            updateUserDisplay();
+            renderPdfs();
+            
+            // Event listeners
+            uploadBtn.addEventListener('click', handleUploadClick);
+            pdfUpload.addEventListener('change', handleFileUpload);
+            closeModal.addEventListener('click', closePdfModal);
+            
+            // Permitir cambiar de usuario (simulación)
+            currentUserAvatar.addEventListener('click', switchUser);
+        }
+
+        // Cambiar de usuario (simulación)
+        function switchUser() {
+            const users = ['mariela', 'carlos', 'esteban', 'javier'];
+            const currentIndex = users.indexOf(state.currentUser);
+            const nextIndex = (currentIndex + 1) % users.length;
+            state.currentUser = users[nextIndex];
+            updateUserDisplay();
+            renderPdfs();
+        }
+
+        // Actualizar la visualización del usuario actual
+        function updateUserDisplay() {
+            const user = state.currentUser;
+            const firstLetter = user.charAt(0).toUpperCase();
+            currentUserAvatar.textContent = firstLetter;
+            currentUserName.textContent = user.charAt(0).toUpperCase() + user.slice(1);
+            
+            // Mostrar/ocultar sección de subida según el usuario
+            if (user === 'mariela') {
+                uploadSection.classList.remove('hidden');
+            } else {
+                uploadSection.classList.add('hidden');
+            }
+        }
+
+        // Manejar clic en botón de subir
+        function handleUploadClick() {
+            pdfUpload.click();
+        }
+
+        // Manejar subida de archivo
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                // Simular subida de archivo
+                const newPdf = {
+                    id: state.pdfs.length + 1,
+                    name: file.name,
+                    approvedBy: []
+                };
+                state.pdfs.push(newPdf);
+                renderPdfs();
+                
+                // Limpiar input
+                event.target.value = '';
+            } else {
+                alert('Por favor, selecciona un archivo PDF válido.');
+            }
+        }
+
+        // Renderizar PDFs en la interfaz
+        function renderPdfs() {
+            if (state.pdfs.length === 0) {
+                pdfsContainer.classList.add('hidden');
+                noPdfs.classList.remove('hidden');
+                return;
+            }
+            
+            pdfsContainer.classList.remove('hidden');
+            noPdfs.classList.add('hidden');
+            
+            pdfsContainer.innerHTML = '';
+            
+            state.pdfs.forEach(pdf => {
+                const pdfItem = document.createElement('div');
+                pdfItem.className = 'pdf-item';
+                
+                pdfItem.innerHTML = `
+                    <div class="pdf-thumbnail">
+                        <div class="pdf-icon">📄</div>
+                    </div>
+                    <div class="pdf-name">${pdf.name}</div>
+                    <div class="user-buttons">
+                        <button class="user-btn mariela ${pdf.approvedBy.includes('mariela') ? 'approved' : ''}" 
+                                data-pdf="${pdf.id}" data-user="mariela"
+                                ${state.currentUser !== 'mariela' ? 'disabled' : ''}>
+                            Mariela
+                        </button>
+                        <button class="user-btn carlos ${pdf.approvedBy.includes('carlos') ? 'approved' : ''}" 
+                                data-pdf="${pdf.id}" data-user="carlos"
+                                ${state.currentUser !== 'carlos' ? 'disabled' : ''}>
+                            Carlos
+                        </button>
+                        <button class="user-btn esteban ${pdf.approvedBy.includes('esteban') ? 'approved' : ''}" 
+                                data-pdf="${pdf.id}" data-user="esteban"
+                                ${state.currentUser !== 'esteban' ? 'disabled' : ''}>
+                            Esteban
+                        </button>
+                        <button class="user-btn javier ${pdf.approvedBy.includes('javier') ? 'approved' : ''}" 
+                                data-pdf="${pdf.id}" data-user="javier"
+                                ${state.currentUser !== 'javier' ? 'disabled' : ''}>
+                            Javier
+                        </button>
+                    </div>
+                `;
+                
+                // Agregar evento para ver PDF
+                const thumbnail = pdfItem.querySelector('.pdf-thumbnail');
+                thumbnail.style.cursor = 'pointer';
+                thumbnail.addEventListener('click', () => viewPdf(pdf.id));
+                
+                // Agregar eventos para los botones de aprobación
+                const userButtons = pdfItem.querySelectorAll('.user-btn');
+                userButtons.forEach(btn => {
+                    if (!btn.disabled) {
+                        btn.addEventListener('click', handleApproval);
+                    }
+                });
+                
+                pdfsContainer.appendChild(pdfItem);
+            });
+        }
+
+        // Manejar aprobación de PDF
+        function handleApproval(event) {
+            const pdfId = parseInt(event.target.dataset.pdf);
+            const user = event.target.dataset.user;
+            
+            const pdf = state.pdfs.find(p => p.id === pdfId);
+            if (pdf) {
+                if (pdf.approvedBy.includes(user)) {
+                    // Quitar aprobación
+                    pdf.approvedBy = pdf.approvedBy.filter(u => u !== user);
+                } else {
+                    // Agregar aprobación
+                    pdf.approvedBy.push(user);
+                }
+                
+                renderPdfs();
+            }
+        }
+
+        // Ver PDF en modal
+        function viewPdf(pdfId) {
+            const pdf = state.pdfs.find(p => p.id === pdfId);
+            if (pdf) {
+                modalTitle.textContent = pdf.name;
+                // En un caso real, aquí cargaríamos el PDF real
+                // Por ahora, mostramos un placeholder
+                pdfViewer.src = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf';
+                pdfModal.classList.remove('hidden');
+            }
+        }
+
+        // Cerrar modal de PDF
+        function closePdfModal() {
+            pdfModal.classList.add('hidden');
+            pdfViewer.src = '';
+        }
+
+        // Inicializar la aplicación cuando se carga la página
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
