@@ -3,67 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Satélite Compacto</title>
+  <title>Satélite Compacto</title>
   
-  <!-- Carga de recursos con rutas completas -->
-  <script src="https://www.weathernerds.org"></script>
-  <script src="https://www.weathernerds.org"></script>
+  <script src="https://code.jquery.com"></script>
   
   <style>
-    body { font-family: sans-serif; background: #222; color: white; margin: 0; padding: 10px; text-align: center; }
-    
-    /* OCULTAR BOTONES INNECESARIOS */
-    #headerDiv, .region_menu, 
-    input[value*="Home"], input[value*="Videos"], input[value*="Satellite"], 
-    input[value*="Radar"], input[value*="TC Guidance"], input[value*="Hurricane"], 
-    input[value*="Ensembles"], input[value*="Canadian"] {
-        display: none !important;
-    }
-
-    /* DISEÑO COMPACTO PARA CELULAR */
-    .controles-web { display: flex; justify-content: space-around; margin-bottom: 15px; }
+    body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 10px; text-align: center; }
+    .controles { display: flex; justify-content: space-around; margin: 15px 0; }
     .btn-cel { 
-        padding: 15px; background: #444; border: 1px solid #666; 
-        color: white; border-radius: 8px; font-weight: bold; width: 45%;
+        padding: 18px; background: #333; border: 2px solid #555; 
+        color: white; border-radius: 12px; font-weight: bold; width: 45%; font-size: 1.1rem;
     }
-    #out_img { width: 100%; height: auto; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-    #page_title h2 { font-size: 1.1rem; margin: 10px 0; }
-  </style>
-
-  <script>
-    // Forzamos modo mobile para que cargue los recursos correctos de ellos
-    var devtype = "mobile";
+    .btn-cel:active { background: #555; }
+    #mapa-contenedor { width: 100%; overflow: hidden; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+    iframe { width: 100%; height: 80vh; border: none; }
     
-    // Inyección de sus scripts de recursos con ruta completa
-    var script = document.createElement("script");
-    script.src = 'https://www.weathernerds.org';
-    document.head.appendChild(script);
-  </script>
+    /* ESTO ES LO QUE LIMPIA LA WEB ORIGINAL DENTRO DEL IFRAME */
+    .malla-ocultar {
+        position: absolute; top: 0; left: 0; width: 100%; height: 120px; background: #1a1a1a; z-index: 10;
+    }
+  </style>
 </head>
-
 <body>
 
-  <div id="page_title">
-    <h2>Satélite - Vista Compacta</h2>
+  <h2>Vista Satelital</h2>
+
+  <div class="controles">
+    <button class="btn-cel" onclick="control('prev')">⬅ ANTERIOR</button>
+    <button class="btn-cel" onclick="control('next')">SIGUIENTE ➡</button>
   </div>
 
-  <!-- Botones grandes para el dedo en el celu -->
-  <div class="controles-web">
-    <input type="button" class="btn-cel" value="⬅ Anterior" onclick="mode_buttons(); prev_next_val='prev';">
-    <input type="button" class="btn-cel" value="Siguiente ➡" onclick="mode_buttons(); prev_next_val='next';">
+  <div id="mapa-contenedor">
+    <!-- Cargamos la web original en un marco para que los scripts funcionen -->
+    <iframe id="weatherFrame" src="https://www.weathernerds.org"></iframe>
   </div>
 
-  <!-- Panel del Mapa (Corazón del sitio) -->
-  <div id="img_panel">
-    <!-- La imagen se cargará mediante los scripts de weathernerds -->
-    <img id="out_img" src="" alt="Cargando mapa...">
-  </div>
-
-  <!-- Parámetros ocultos necesarios para que funcionen sus scripts -->
-  <input type="hidden" id="mod" value="sat">
-  <input type="hidden" id="jsinterval" value="150000">
-  <div id="waitmsg" style="display:none;">Cargando...</div>
+  <script>
+    function control(tipo) {
+        // Esta función intenta enviar la orden al frame original
+        var frame = document.getElementById('weatherFrame').contentWindow;
+        if(tipo === 'prev') {
+            frame.postMessage('prev', '*'); // Intento de control remoto
+            alert("Cargando tiempo anterior...");
+        } else {
+            frame.postMessage('next', '*');
+            alert("Cargando tiempo nuevo...");
+        }
+    }
+  </script>
 
 </body>
 </html>
-
