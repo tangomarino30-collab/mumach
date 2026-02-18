@@ -1,56 +1,781 @@
+
 <!doctype html>
+
 <html>
+
+<link rel="shortcut icon" type="image/x-icon" href="/gfs_favicon.ico">
+
+<meta https-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Satélite Compacto</title>
-  
-  <script src="https://code.jquery.com"></script>
-  
-  <style>
-    body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 10px; text-align: center; }
-    .controles { display: flex; justify-content: space-around; margin: 15px 0; }
-    .btn-cel { 
-        padding: 18px; background: #333; border: 2px solid #555; 
-        color: white; border-radius: 12px; font-weight: bold; width: 45%; font-size: 1.1rem;
-    }
-    .btn-cel:active { background: #555; }
-    #mapa-contenedor { width: 100%; overflow: hidden; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-    iframe { width: 100%; height: 80vh; border: none; }
-    
-    /* ESTO ES LO QUE LIMPIA LA WEB ORIGINAL DENTRO DEL IFRAME */
-    .malla-ocultar {
-        position: absolute; top: 0; left: 0; width: 100%; height: 120px; background: #1a1a1a; z-index: 10;
-    }
-  </style>
-</head>
-<body>
 
-  <h2>Vista Satelital</h2>
+  <title>Weathernerds Satellite Data</title>
 
-  <div class="controles">
-    <button class="btn-cel" onclick="control('prev')">⬅ ANTERIOR</button>
-    <button class="btn-cel" onclick="control('next')">SIGUIENTE ➡</button>
-  </div>
+  <!-- Use jquery resources -->
+  <script src="/models/v3.0/gfs/javascript/jquery.min.js"></script>
 
-  <div id="mapa-contenedor">
-    <!-- Cargamos la web original en un marco para que los scripts funcionen -->
-    <iframe id="weatherFrame" src="https://www.weathernerds.org"></iframe>
-  </div>
-
+  <!-- Detect if mobile or desktop device is being used -->
   <script>
-    function control(tipo) {
-        // Esta función intenta enviar la orden al frame original
-        var frame = document.getElementById('weatherFrame').contentWindow;
-        if(tipo === 'prev') {
-            frame.postMessage('prev', '*'); // Intento de control remoto
-            alert("Cargando tiempo anterior...");
-        } else {
-            frame.postMessage('next', '*');
-            alert("Cargando tiempo nuevo...");
+    function detect_devtype() {
+        devtype = "desktop";
+        if ( window.matchMedia("(max-width: 1024px)").matches ) {
+            devtype = "mobile";
         }
     }
+    detect_devtype();
   </script>
 
+  <!-- Load appropriate header and footer -->
+  <script> 
+      $(function(){
+          if ( devtype == "desktop" ) {
+              $("#headerDiv").load("/standard_header.html");
+          } else {
+              $("#headerDiv").load("/mobile_header.html");
+          }
+          $("#footerDiv").load("/standard_footer.html");
+      });  
+  </script>
+
+  <!-- Load appropriate css resources -->
+  <script>
+    function set_css() {
+    var link    = document.createElement('link');
+    link.rel    = 'stylesheet';
+    link.type   = 'text/css';
+    if ( devtype == "desktop" ) {
+        link.href = 'sat_css_min.css?202012091600';
+    } else {
+        link.href = 'sat_css_mobile_min.css?202012091600';
+    }
+    document.head.appendChild(link);
+  }
+  set_css();
+  </script>
+
+  <style>
+  @-moz-document url-prefix() {
+    .tooltip .tooltiptext {
+        top: 25px !important;
+    }
+    .sattime_tooltip .sattime_tooltiptext {
+        top: 335px !important;
+    }
+  }
+  .tcIcon {
+    background-color: rgba(255,255,255,0);
+  }
+  .tcIcon:hover {
+    background-color: rgba(127,127,127,0.3);
+  }
+  </style>
+
+<!-- Google Analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-105751053-1', 'auto');
+  ga('send', 'pageview');
+</script>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-9P2BJRBFP3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-9P2BJRBFP3');
+</script>
+
+</head>
+
+<!-- Day/Night switch parameters (Z-time) -->
+<input type="hidden" id="startvis"   value="22" />
+<input type="hidden" id="endvis"     value="22" />
+<input type="hidden" id="jsinterval" value="150000" />
+
+<body onload="styleMeasureTool(); styleTopButtons();">
+
+  <!-- Use zoom box scripts -->
+  <script type='text/javascript' src='/models/v3.0/gfs/javascript/cross_browser/x/x.js'></script>
+  <script type='text/javascript' src='/models/v3.0/gfs/javascript/cross_browser/x/lib/xenabledrag.js'></script>
+
+  <!-- Satellite and user-device specific javascript resources -->
+  <script>
+      var script  = document.createElement("script");
+      if ( devtype == "desktop" ) {
+          script.src = 'sat_resources_min.js?202412121200';
+      } else {
+          script.src = 'sat_resources_mobile_min.js?202410241900';
+      }
+      var head = document.getElementsByTagName("head")[0];
+      head.appendChild(script);
+  </script>
+
+  <!-- Load current HWRF/HMON/HAFS storms into the menus -->
+  <script src="/models/v3.0/gfs/javascript/check_hurricane_min.js?2023061812"></script>
+
+<!-- ------------------------------------------------------------------------------------------------------------------------------------------------- -->
+
+
+<table cellpadding="0" cellspacing="0"><tr><td>   <!--- Table containing whole page -->
+
+<center>
+
+<!-- Standard page header -->
+<div id="headerDiv"></div>
+
+<!-- TEMPORARY GOES STATUS MESSAGE
+<h3><font color="red"><center><b>
+Sep 27, 2024 18:00 UTC: Satellite data is delayed due to issues with the upstream data provider.
+</center></b></font></h3>
+-->
+
+<header id="header_table">
+  <table width="20%">
+    <td nowrap>
+        <input onclick="mode_buttons(); prev_next_val='prev';" type="button" id="prev_button" value="Older Time" class="field" />
+    </td>
+    <td nowrap style="min-width:150px" id="spacer1"></td>
+    <td nowrap id="page_title">
+      <h2>Weathernerds Satellite Data</h2>
+    </td>
+    <td nowrap style="min-width:100px" id="spacer2"></td>
+    <td nowrap>
+        <input id="floaters_link" type="button" onclick="location.href='/satellite/floaters/'" class="other_action_buttons other_action_buttons_hover" value="Storm Floaters" style="border:3px solid black; min-width: 180px" /></td>
+    </td>
+    <td nowrap style="min-width:50px" id="spacer3"></td>
+    <td nowrap>
+        <input onclick="mode_buttons(); prev_next_val='next';" type="button" id="next_button" value="Newer Time" class="field" />
+    </td>
+  </table>
+
+</header>
+
+</center>
+
+</td></tr><tr><td>   <!-- Divide top of page from model display area... -->
+
+<!-- -------------------------------------------------------------------------------------------------------------- -->
+
+<!-- Wait message that pops up during loop, sounding, and skewt requests -->
+<div id="waitmsg" class="modal"></div>
+
+<!-- GIF download dialog that pops up for users to download their GIF -->
+<div id="gifdialog" class="gifdialogclass"></div>
+
+<!-- Define model name (ecmwf) and generate a random session ID number -->
+<input type="hidden" name="model"   id="mod"     value="sat"                                                     />
+
+<div id="controls">
+
+  <table><tr><td valign="top" width="101px">
+
+  <div id="modvars">
+
+    <!-- Available Regional Zooms -->
+    <div class="region_menu">
+      <button class="region_button region_toggle_button">Other Regions</button>
+      <div id="RegionsDiv" class="region_content region_toggle">
+
+        <div id="regmap_div">
+          <img id="regmap" src="/satellite/regions.png?202004152102" usemap="#RegionsMap" style="border-radius:7.5%; box-shadow: 0px 0px 30px 15px #000000;"/>
+          <map name="RegionsMap" id="RegionsMap">
+
+              <!-- Regions and the highlightable divs -->
+              <div  id="conus_divarea" style="position:absolute; top:135px; left:527px; height:128px; width:214px; pointer-events:none;"></div>
+              <area id="conus_name" shape="rect" coords="598,163,658,223" onclick="document.getElementById('conus_button').click();">
+              <div  id="natl_divarea" style="position:absolute; top:153px; left:610px; height:184px; width:331px; pointer-events:none;"></div>
+              <area id="natl_name" shape="rect" coords="716,209,884,269" onclick="document.getElementById('natl_button').click();">
+              <div  id="satl_divarea" style="position:absolute; top:337px; left:610px; height:257px; width:331px; pointer-events:none;"></div>
+              <area id="satl_name" shape="rect" coords="746,466,914,526" onclick="document.getElementById('satl_button').click();">
+              <div  id="epac_divarea" style="position:absolute; top:190px; left:450px; height:147px; width:230px; pointer-events:none;"></div>
+              <area id="epac_name" shape="rect" coords="487,242,631,302" onclick="document.getElementById('epac_button').click();">
+              <div  id="cpac_divarea" style="position:absolute; top:208px; left:343px; height:147px; width:184px; pointer-events:none;"></div>
+              <area id="cpac_name" shape="rect" coords="339,246,519,306" onclick="document.getElementById('cpac_button').click();">
+              <div  id="spac_divarea" style="position:absolute; top:300px; left:266px; height:294px; width:344px; pointer-events:none;"></div>
+              <area id="spac_name" shape="rect" coords="354,411,510,471" onclick="document.getElementById('spac_button').click();">
+              <div  id="npac_divarea" style="position:absolute; top:116px; left:266px; height:184px; width:344px; pointer-events:none;"></div>
+              <area id="npac_name" shape="rect" coords="354,163,510,223" onclick="document.getElementById('npac_button').click();">
+              <div  id="alaska_divarea" style="position:absolute; top:46px; left:328px; height:144px; width:214px; pointer-events:none;"></div>
+              <area id="alaska_name" shape="rect" coords="393,82,465,142" onclick="document.getElementById('alaska_button').click();">
+              <div  id="canada_divarea" style="position:absolute; top:46px; left:481px; height:162px; width:291px; pointer-events:none;"></div>
+              <area id="canada_name" shape="rect" coords="585,73,657,133" onclick="document.getElementById('canada_button').click();">
+              <div  id="atlpac_divarea" style="position:absolute; top:135px; left:481px; height:202px; width:398px; pointer-events:none;"></div>
+              <area id="atlpac_name" shape="rect" coords="578,200,770,260" onclick="document.getElementById('atlpac_button').click();">
+              <div  id="nsamer_divarea" style="position:absolute; top:278px; left:610px; height:169px; width:254px; pointer-events:none;"></div>
+              <area id="nsamer_name" shape="rect" coords="623,327,839,387" onclick="document.getElementById('nsamer_button').click();">
+              <div  id="ssamer_divarea" style="position:absolute; top:374px; left:610px; height:183px; width:254px; pointer-events:none;"></div>
+              <area id="ssamer_name" shape="rect" coords="623,430,839,490" onclick="document.getElementById('ssamer_button').click();">
+              <div  id="wpac_divarea" style="position:absolute; top:98px; left:21px; height:239px; width:353px; pointer-events:none;"></div>
+              <area id="wpac_name" shape="rect" coords="126,192,270,252" onclick="document.getElementById('wpac_button').click();">
+              <div  id="aus_divarea" style="position:absolute; top:337px; left:21px; height:239px; width:322px; pointer-events:none;"></div>
+              <area id="aus_name" shape="rect" coords="122,435,230,495" onclick="document.getElementById('aus_button').click();">
+
+              <!-- Place floater links onto map here -->
+              <div id="floaterMap"></div>
+
+          </map>
+
+        </div>
+
+        <div id="regs_text" style="display: none;">
+          <input id="conus_button"  onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="CONUS View"         class="model_field field" /> <br>
+          <input id="natl_button"   onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="North Atlantic"     class="model_field field" /> <br>
+          <input id="satl_button"   onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="South Atlantic"     class="model_field field" /> <br>
+          <input id="epac_button"   onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="East Pacific"       class="model_field field" /> <br>
+          <input id="cpac_button"   onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="Central Pacific"    class="model_field field" /> <br>
+          <input id="spac_button"   onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="South Pacific"      class="model_field field" /> <br>
+          <input id="npac_button"   onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="North Pacific"      class="model_field field" /> <br>
+          <input id="alaska_button" onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="Alaska"             class="model_field field" /> <br>
+          <input id="canada_button" onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="Canada"             class="model_field field" /> <br>
+          <input id="atlpac_button" onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="Atlantic-Pacific"   class="model_field field" /> <br>
+          <input id="nsamer_button" onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="Northern S America" class="model_field field" /> <br>
+          <input id="ssamer_button" onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="Southern S America" class="model_field field" /> <br>
+          <input id="wpac_button"   onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="West Pacific"       class="model_field field" /> <br>
+          <input id="aus_button"    onclick="sounding='False';plot_type='zoom';region=1;change_mode();back2zoom();" type="button" value="Australia"          class="model_field field" /> <br>
+
+          <!-- Place mobile floater links here -->
+          <div id="region_content_menu"></div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Available satellite times -->
+    <div class="sattime_menu">
+      <button class="sattime_button sattime_toggle_button">Satellite Time</button>
+      <div id="time_toggle" class="sattime_content sattime_toggle">
+        <div id="sattime_div" class="sattime_tooltip" style="display:inline;">
+        <table><tr><td>
+          <input type="radio" name="sattime" id="f000" value="000" checked="checked"/><label id="lbl000" for="f000">000 Hr</label>
+          <input type="radio" name="sattime" id="f010" value="010"                  /><label id="lbl010" for="f010">010 Hr</label>
+          <input type="radio" name="sattime" id="f020" value="020"                  /><label id="lbl020" for="f020">020 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f001" value="001"                  /><label id="lbl001" for="f001">001 Hr</label>
+          <input type="radio" name="sattime" id="f011" value="011"                  /><label id="lbl011" for="f011">011 Hr</label>
+          <input type="radio" name="sattime" id="f021" value="021"                  /><label id="lbl021" for="f021">021 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f002" value="002"                  /><label id="lbl002" for="f002">002 Hr</label>
+          <input type="radio" name="sattime" id="f012" value="012"                  /><label id="lbl012" for="f012">012 Hr</label>
+          <input type="radio" name="sattime" id="f022" value="022"                  /><label id="lbl022" for="f022">022 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f003" value="003"                  /><label id="lbl003" for="f003">003 Hr</label>
+          <input type="radio" name="sattime" id="f013" value="013"                  /><label id="lbl013" for="f013">013 Hr</label>
+          <input type="radio" name="sattime" id="f023" value="023"                  /><label id="lbl023" for="f023">023 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f004" value="004"                  /><label id="lbl004" for="f004">004 Hr</label>
+          <input type="radio" name="sattime" id="f014" value="014"                  /><label id="lbl014" for="f014">014 Hr</label>
+          <input type="radio" name="sattime" id="f024" value="024"                  /><label id="lbl024" for="f024">024 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f005" value="005"                  /><label id="lbl005" for="f005">005 Hr</label>
+          <input type="radio" name="sattime" id="f015" value="015"                  /><label id="lbl015" for="f015">015 Hr</label>
+          <input type="radio" name="sattime" id="f025" value="025"                  /><label id="lbl025" for="f025">025 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f006" value="006"                  /><label id="lbl006" for="f006">006 Hr</label>
+          <input type="radio" name="sattime" id="f016" value="016"                  /><label id="lbl016" for="f016">016 Hr</label>
+          <input type="radio" name="sattime" id="f026" value="026"                  /><label id="lbl026" for="f026">026 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f007" value="007"                  /><label id="lbl007" for="f007">007 Hr</label>
+          <input type="radio" name="sattime" id="f017" value="017"                  /><label id="lbl017" for="f017">017 Hr</label>
+          <input type="radio" name="sattime" id="f027" value="027"                  /><label id="lbl027" for="f027">027 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f008" value="008"                  /><label id="lbl008" for="f008">008 Hr</label>
+          <input type="radio" name="sattime" id="f018" value="018"                  /><label id="lbl018" for="f018">018 Hr</label>
+          <input type="radio" name="sattime" id="f028" value="028"                  /><label id="lbl028" for="f028">028 Hr</label>
+        </td></tr><tr><td>
+          <input type="radio" name="sattime" id="f009" value="009"                  /><label id="lbl009" for="f009">009 Hr</label>
+          <input type="radio" name="sattime" id="f019" value="019"                  /><label id="lbl019" for="f019">019 Hr</label>
+          <input type="radio" name="sattime" id="f029" value="029"                  /><label id="lbl029" for="f029">029 Hr</label>
+        </td></tr></table>
+        <span id="sattime_span" class="sattime_tooltiptext"><b>Click a time, then<br>press Enter to update,<br>or click 'Update Plot'</b></span>
+       	</div>
+      </div>
+    </div>
+
+    <br>
+
+    <!-- Available Satellite data types -->
+    <div class="sattype_menu">
+      <button class="sattype_button sattype_toggle_button">Data Type</button>
+      <div id="type_toggle" class="sattype_content sattype_toggle">
+        <div id="datatype_div" class="sattime_tooltip" style="display:inline;">
+          <input type="radio" name="sattype" id="typevis"  value="vis"  onclick="default_colors();" checked="checked" /><label for="typevis">Visible</label><br>
+          <input type="radio" name="sattype" id="typeir"   value="ir"   onclick="default_colors();"                   /><label for="typeir">IR</label><br>
+          <input type="radio" name="sattype" id="typewv"   value="wv"   onclick="default_colors();"                   /><label for="typewv">Water Vapor</label><br>
+          <input type="radio" name="sattype" id="typesw"   value="swir" onclick="default_colors();"                   /><label for="typesw">SW IR</label><br>
+          <span id="datatype_span" class="sattime_tooltiptext"><b>Click a data type, then<br>press Enter to update,<br>or click 'Update Plot'</b></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Available color schemes -->
+    <div class="colorscheme_menu">
+      <button class="colorscheme_button colorscheme_toggle_button">Color Scheme</button>
+      <div id="colorscheme_toggle" class="colorscheme_content colorscheme_toggle">
+        <input type="radio" name="colorscheme" id="vis1" value="vis1" checked="checked" onclick="changeSettings=1;" /><label style="display:inline-block; width:170px;" for="vis1">Grayscale</label><br>
+        <input type="radio" name="colorscheme" id="ir1"  value="ir1"                    onclick="changeSettings=1;" /><label style="display:inline-block; width:170px;" for="ir1" >Color Enhanced</label><br>
+        <input type="radio" name="colorscheme" id="ir2"  value="ir2" class="ir2"        onclick="changeSettings=1;" /><label style="display:inline-block; width:170px;" for="ir2" >AVN Scheme</label><br>
+        <input type="radio" name="colorscheme" id="bd1"  value="bd1" class="bd1"        onclick="changeSettings=1;" /><label style="display:inline-block; width:170px;" for="bd1" >Dvorak BD</label><br>
+      </div>
+    </div>
+
+    <!-- Additional side panel controls -->
+    <br>
+    <input onclick="setMeasureTool();" type="button" id="distance_tool" value="Measure" class="other_action_buttons other_action_buttons_hover" />
+
+    <!-- Animated GIF Export Menu -->
+    <br>
+    <div class="sattype_menu">
+      <button id="animated_gif_button" class="sattype_button animated_gif_button">Animated GIF</button>
+      <div id="gif_menu" class="sattype_content gif_toggle">
+        <table nowrap>
+            <tr>
+                <td nowrap colspan="2"><b><center> GIF Settings </b></center></td>
+                <td colspan="2"><center><input style="font-size:70%; border-style:solid; border-color:black;" onclick="setGIFloop();" type="button" id="gifloopbutton" value="Use Loop Settings" class="other_action_buttons" /></center></td>
+            </tr><tr>
+                <td nowrap colspan="2" style="font-size:25%;"> &nbsp </td>
+            </tr><tr><td nowrap style="text-align:right;">
+                </td></tr><tr><td id="gif_nframes_text" nowrap style="text-align:right;">
+                    <b>Number of Frames:</b>
+                </td><td nowrap style="text-align:left;">
+                    <input type="text" pattern="\d*" name="gif_int"   id="gifnframes" value="20" size="5"/>
+                </td><td nowrap style="text-align:right;">
+                    <b>Speed (fps):</b>
+                </td><td nowrap style="text-align:left;">
+                    <input type="text" pattern="\d*" name="gif_speed" id="gifspeed"   value="8"  size="5"/>
+                </td>
+                </tr><tr><td colspan="4">
+                    <center><input id="makegif" style="border-style:solid; border-color:black;" onclick="getgif='True';" type="button" value="Make GIF" class="field"/></center>
+                </td>
+            </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Display Option Toggles -->
+    <br>
+    <div class="sattype_menu">
+      <button class="sattime_button display_options_button other_action_buttons_hover">Display Options</button>
+      <div id="display_menu" class="sattype_content display_toggle">
+        <table class="displayOptionsTable" nowrap>
+            <tr>
+                <td nowrap align="left" colspan="7"><b><center> Choose satellite, turn overlays on/off <br></td>
+            </tr><tr>
+                <td colspan="7" align="center"><b><u>Choose Satellite Source</u></b></td>
+            </tr><tr>
+                <td colspan="1" align="right" nowrap><b> Source Mode: </b></td>
+                <td colspan="3"><input type="radio" name="satsrc"  id="satsrc_On"  value="On"       checked="checked"   onclick="setSourceAuto(); changeSettings=1;"       /><label for="satsrc_On">Auto</label></td>
+                <td colspan="3"><input type="radio" name="satsrc"  id="satsrc_Off" value="Off"                          onclick="setSourceManual(); changeSettings=1;"     /><label for="satsrc_Off">Manual</label></td>
+            </tr><tr>
+                <td colspan="1" align="right" nowrap><b> Source: </b></td>
+                <td colspan="6"><input type="radio" name="satname" id="GOES-E"     value="GOES-E"   disabled="disabled" onclick="resetLightning('ge'); changeSettings=1;" /><label id="gelabel" for="GOES-E" style="max-width:83px;">GOES-E</label>
+	                        <input type="radio" name="satname" id="GOES-W"     value="GOES-W"   disabled="disabled" onclick="resetLightning('gw'); changeSettings=1;" /><label id="gwlabel" for="GOES-W" style="max-width:83px;">GOES-W</label>
+                                <input type="radio" name="satname" id="Himawari"   value="Himawari" disabled="disabled" onclick="resetLightning('gw'); changeSettings=1;" /><label id="himlabel" for="Himawari" style="max-width:83px;">Himawari</label></td>
+            </tr><tr>
+                <td colspan="7"><br></td>
+            </tr>
+        </table><table class="displayOptionsTable" nowrap>
+            <tr>
+                <td colspan="7" align="center"><b><u>Geostationary Lightning Mapper (GLM)</u></b></td>
+            </tr><tr>
+                <td colspan="1" align="right" nowrap><b> GOES-E Lightning: </b></td>
+                <td colspan="3"><input                     type="radio" name="lightning_ge" id="lightning_ge_On"  value="On"  checked="checked" onclick="changeSettings=1;" /><label for="lightning_ge_On">On</label></td>
+                <td colspan="3"><input                     type="radio" name="lightning_ge" id="lightning_ge_Off" value="Off"                   onclick="changeSettings=1;" /><label for="lightning_ge_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" align="right" nowrap><b> GOES-W Lightning: </b></td>
+                <td colspan="3"><input                     type="radio" name="lightning_gw" id="lightning_gw_On"  value="On"                    onclick="changeSettings=1;" /><label for="lightning_gw_On">On</label></td>
+                <td colspan="3"><input                     type="radio" name="lightning_gw" id="lightning_gw_Off" value="Off" checked="checked" onclick="changeSettings=1;" /><label for="lightning_gw_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" nowrap align="right" style="font-size:90%;"><b>Flash Extent Density:</b></td>
+                <td colspan="3" style="width:20px;"><input type="radio" name="ltng_fed"      id="ltng_fed_On"       value="On"                    onclick="document.getElementById('ltng_toe_Off').checked = true; document.getElementById('lightning_ge_Off').checked = true; document.getElementById('lightning_gw_Off').checked = true; changeSettings=1;" /><label for="ltng_fed_On">On</label></td>
+                <td colspan="3" style="width:20px;"><input type="radio" name="ltng_fed"      id="ltng_fed_Off"      value="Off" checked="checked" onclick="changeSettings=1;" /><label for="ltng_fed_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" nowrap align="right" style="font-size:90%;"><b>Total Optical Energy:</b></td>
+                <td colspan="3" style="width:20px;"><input type="radio" name="ltng_toe"      id="ltng_toe_On"       value="On"                    onclick="document.getElementById('ltng_fed_Off').checked = true; document.getElementById('lightning_ge_Off').checked = true; document.getElementById('lightning_gw_Off').checked = true; changeSettings=1;" /><label for="ltng_toe_On">On</label></td>
+                <td colspan="3" style="width:20px;"><input type="radio" name="ltng_toe"      id="ltng_toe_Off"      value="Off" checked="checked" onclick="changeSettings=1;" /><label for="ltng_toe_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="7"><br></td>
+            </tr>
+        </table><table class="displayOptionsTable" nowrap>
+            <tr>
+                <td colspan="7" align="center"><b><u>Sea Surface Temperature</u></b></td>
+            </tr><tr>
+                <td colspan="1" align="right" ><b> SST: </b></td>
+                <td colspan="3"><input type="radio" name="sst" id="sst_On"  value="On"                    onclick="changeSettings=1;" /><label for="sst_On">On</label></td>
+                <td colspan="3"><input type="radio" name="sst" id="sst_Off" value="Off" checked="checked" onclick="changeSettings=1;" /><label for="sst_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="7"><br></td>
+            </tr>
+        </table><table class="displayOptionsTable" nowrap>
+            <tr>
+                <td colspan="7" align="center"><b><u>Satellite Winds</u></b></td>
+            </tr><tr>
+                <td colspan="1" align="right"><b> ASCAT-B: </b></td>
+                <td colspan="3"><input type="radio" name="ascatb" id="ascatb_On"  value="On"                    onclick="changeSettings=1; document.getElementById('ascatambb_Off').checked = true; document.getElementById('ascatambc_Off').checked = true;" /><label for="ascatb_On">On</label></td>
+                <td colspan="3"><input type="radio" name="ascatb" id="ascatb_Off" value="Off" checked="checked" onclick="changeSettings=1;" /><label for="ascatb_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" align="right"><b> ASCAT-C: </b></td>
+                <td colspan="3"><input type="radio" name="ascatc" id="ascatc_On"  value="On"                    onclick="changeSettings=1; document.getElementById('ascatambb_Off').checked = true; document.getElementById('ascatambc_Off').checked = true;" /><label for="ascatc_On">On</label></td>
+                <td colspan="3"><input type="radio" name="ascatc" id="ascatc_Off" value="Off" checked="checked" onclick="changeSettings=1;" /><label for="ascatc_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" align="right"><b> ASCAT-B Amb: </b></td>
+                <td colspan="3"><input type="radio" name="ascatambb" id="ascatambb_On"  value="On"                    onclick="changeSettings=1; document.getElementById('ascatb_Off').checked = true; document.getElementById('ascatc_Off').checked = true; document.getElementById('ascatambc_Off').checked = true;" /><label for="ascatambb_On">On</label></td>
+                <td colspan="3"><input type="radio" name="ascatambb" id="ascatambb_Off" value="Off" checked="checked" onclick="changeSettings=1;" /><label for="ascatambb_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" align="right"><b> ASCAT-C Amb: </b></td>
+                <td colspan="3"><input type="radio" name="ascatambc" id="ascatambc_On"  value="On"                    onclick="changeSettings=1; document.getElementById('ascatb_Off').checked = true; document.getElementById('ascatc_Off').checked = true; document.getElementById('ascatambb_Off').checked = true;" /><label for="ascatambc_On">On</label></td>
+                <td colspan="3"><input type="radio" name="ascatambc" id="ascatambc_Off" value="Off" checked="checked" onclick="changeSettings=1;" /><label for="ascatambc_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="7"><br></td>
+            </tr>
+        </table><table class="displayOptionsTable">
+            <tr>
+                <td colspan="7" align="center"><b><u>Ensemble Tracks</u></b></td>
+            </tr><tr>
+                <td colspan="1" align="center"><b> Model: </b></td>
+                <td colspan="3" align="center"><b> ECENS  </b></td>
+                <td colspan="3" align="center"><b> GEFS   </b></td>
+            </tr><tr>
+                    <td colspan="1"></td>
+                    <td colspan="3">
+                        <select name="ecens" id="ecens" style="min-width:140px" onchange="changeSettings=1;">
+                            <option id="ecyc0" value="Off"   style="text-align: center">Off</option>
+                            <option id="ecyc1" value="ecyc1" style="text-align: center">e1</option>
+                            <option id="ecyc2" value="ecyc2" style="text-align: center">e2</option>
+                            <option id="ecyc3" value="ecyc3" style="text-align: center">e3</option>
+                            <option id="ecyc4" value="ecyc4" style="text-align: center">e4</option>
+                        </select>
+                    </td>
+                    <td colspan="3">
+                        <select name="gefs" id="gefs" style="min-width:140px" onchange="changeSettings=1;">
+                            <option id="gcyc0" value="Off"   style="text-align: center">Off</option>
+                            <option id="gcyc1" value="gcyc1" style="text-align: center">g1</option>
+                            <option id="gcyc2" value="gcyc2" style="text-align: center">g2</option>
+                            <option id="gcyc3" value="gcyc3" style="text-align: center">g3</option>
+                            <option id="gcyc4" value="gcyc4" style="text-align: center">g4</option>
+                        </select>
+                    </td>
+            </tr><tr>
+                <td colspan="7"><br></td>
+            </tr>
+        </table><table class="displayOptionsTable" nowrap>
+            <tr>
+                <td colspan="7" align="center"><b><u>Map Options</u></b></td>
+            </tr><tr>
+                <td colspan="1" align="right"><b> Interstates: </b></td>
+                <td colspan="3"><input type="radio" name="highways"   id="highways_On"    value="On"  checked="checked" onclick="changeSettings=1;" /><label for="highways_On">On</label></td>
+                <td colspan="3"><input type="radio" name="highways"   id="highways_Off"   value="Off"                   onclick="changeSettings=1;" /><label for="highways_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" align="right"><b> Warnings: </b></td>
+                <td colspan="3"><input type="radio" name="warnings"   id="warnings_On"    value="On"  checked="checked" onclick="changeSettings=1;" /><label for="warnings_On">On</label></td>
+                <td colspan="3"><input type="radio" name="warnings"   id="warnings_Off"   value="Off"                   onclick="changeSettings=1;" /><label for="warnings_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" nowrap align="right"><b> Lat/Lon Lines: </b></td>
+                <td colspan="3"><input type="radio" name="latlon"     id="latlon_On"      value="On"                    onclick="changeSettings=1;" /><label for="latlon_On">On</label></td>
+                <td colspan="3"><input type="radio" name="latlon"     id="latlon_Off"     value="Off" checked="checked" onclick="changeSettings=1;" /><label for="latlon_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="1" nowrap align="right"><b> Auto Update: </b></td>
+                <td colspan="3"><input type="radio" name="autoUpdate" id="autoUpdate_On"  value="On"                                                /><label for="autoUpdate_On">On</label></td>
+                <td colspan="3"><input type="radio" name="autoUpdate" id="autoUpdate_Off" value="Off" checked="checked"                             /><label for="autoUpdate_Off">Off</label></td>
+            </tr><tr>
+                <td colspan="7"> &nbsp </td>
+            </tr><tr>
+                <td nowrap align="left" colspan="7"><center><b>Note: Interstates/Warnings only appear <br> 
+                                                               when zoomed in sufficiently; click <br>
+                                                              'Update Plot' for changes to take effect</b></center>
+                </td>
+            </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Keyboard shortcuts -->
+    <br>
+    <div class="shortcuts_menu">
+      <button id="keycuts_button" class="shortcuts_button">Keyboard Shortcuts</button>
+      <div class="shortcuts_content">
+          <table nowrap>
+              <tr>
+                  <td nowrap align="right"><b> Enter key: </b>
+                  </td><td nowrap align="right"><b> Update Plot </b>
+              </tr><tr>
+                  <td nowrap align="right"><b> M key: </b>
+                  </td><td nowrap align="right"><b> Back to Zoom Mode </b>
+              </tr><tr>
+                  <td nowrap align="right"><b> Left Arrow: </b>
+                  </td><td nowrap align="right"><b> Older Time </b>
+              </tr><tr>
+                  <td nowrap align="right"><b> Right Arrow: </b>
+                  </td><td nowrap align="right"><b> Newer Time </b>
+              </tr>
+          </table>
+      </div>
+    </div>
+
+    <!-- Most Recent satellite data message -->
+    <br><br>
+    <div id="recent_model">
+        <center>Most Recent<br>
+                <div id="cursatname">GOES-E</div> data<br>
+                <div id="recmod"><center><b>00</b></center></div>
+                <div id="recmod_hour"><center><b>00</b></center></div>
+        </center>
+    </div>
+
+    <br>
+    <!-- Patreon side bar link -->
+    <center>
+    <div id="patreon2" class="qmark" style="text-align:center; font-size:0.75em;" onclick="window.open('/send_to_patreon.html','_blank');"><b> Support <br> Weathernerds</b><br><img src="/patreon.png" /></div>
+    </center>
+
+  </div>
+
+  </td><td>
+
+  <table>
+    <tr><td id="mode_buttons_spacer" nowrap>
+      <div id="mode_buttons">
+        <button id="update_button" onclick="mode_buttons();" class="field">Update Plot</button>
+        <div id="zoom_button_div" class="tooltip" style="display:inline;">
+            <button id="zoom_in_button" onclick="sounding='False';mode_buttons();" class="field">Zoom In</button>
+            <span id="zoom_cross_span" class="tooltiptext"><b>Draw box on map,<br>then click this button</b></span>
+        </div>
+        <button id="zoom_out_button" onclick="sounding='False';plot_type='zoom';region=1;change_mode();document.getElementById('latlon_Off').checked = true;" class="field">Zoom Out</button>
+
+        <!-- Loop button menu here -->
+        <div id="top_loop_menu" class="loop_menu">
+            <button id="top_loop_button" class="loop_button">Loop</button>
+            <div id="top_loop_content" class="loop_content loop_content_primary loop_toggle">
+                <table><tr><td>&nbsp</td></tr><tr><td nowrap>
+                    <b>Number of Frames:</b>
+                </td><td nowrap>
+                    <input type="text" pattern="\d*" name="loop_nframes"   id="nframes"   value="20"   size="5"/>
+                </td></tr><tr><td colspan="2" align="center" nowrap>
+                    <input onclick="sounding='False';toloop='True';mode_buttons();" type="button" id="getloop" value="Get Loop" class="field"/>
+                </td></tr></table>
+            </div>
+        </div>
+
+        <!-- Trajectory menu here -->
+        <div id="top_trajectory_menu" class="trajectory_menu">
+            <button id="top_trajectory_button" class="trajectory_button">Trajectory</button>
+            <div id="top_trajectory_content" class="trajectory_content trajectory_content_primary trajectory_toggle" style="min-height:380px;">
+                <table><tr><td>&nbsp</td></tr><tr><td nowrap>
+                    <b>Delta-t (minutes):</b>
+                </td><td nowrap>
+                    <select name="trajdt" id="trajdt" style="min-width:140px">
+                        <option value="20">20</option>
+                        <option value="5"> &nbsp&nbsp5 (more accurate)</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="60">60 (faster)</option>
+                    </select>
+                </td></tr><tr><td nowrap>
+                    <b>Start Pres Lev (mb):</b>
+                </td><td nowrap>
+                    <select name="trajp" id="trajp" style="min-width:140px">
+                        <option value="850">850</option>
+                        <option value="Surface">Surface</option>
+                        <option value="1000">1000</option>
+                        <option value="950">950</option>
+                        <option value="900">900</option>
+                        <option value="850">850</option>
+                        <option value="800">800</option>
+                        <option value="750">750</option>
+                        <option value="700">700</option>
+                        <option value="650">650</option>
+                        <option value="600">600</option>
+                        <option value="550">550</option>
+                        <option value="500">500</option>
+                        <option value="450">450</option>
+                        <option value="400">400</option>
+                        <option value="350">350</option>
+                        <option value="300">300</option>
+                        <option value="250">250</option>
+                        <option value="200">200</option>
+                    </select>
+                </td></tr><tr><td colspan="2" align="center" nowrap>
+                    <br><input onclick="sounding='False';toloop='False';mode_buttons();tdt=getElementById('trajdt').value;tp=getElementById('trajp').value;traj='Compute-'+tdt+'-'+tp;" type="button" id="getTrajectory" value="Get Back Trajectory" class="field" style="border:3px solid black;"/>
+                </td></tr><tr><td colspan="2" align="center" nowrap>
+                    <br><input onclick="sounding='False';toloop='False';mode_buttons();traj='Clear';" type="button" id="clearTrajectories" value="Clear Trajectories" class="field" style="border:3px solid black;"/>
+                </td></tr><tr><td nowrap colspan="2"><br><br><b> Time Labels: </b>
+                    <input type="radio" name="trajLabs" id="trajLabs_On"  value="On"  checked="checked" onclick="changeSettings=1;" /><label for="trajLabs_On">On</label>
+                    <input type="radio" name="trajLabs" id="trajLabs_Off" value="Off"                   onclick="changeSettings=1;" /><label for="trajLabs_Off">Off</label>
+                </td></tr></table>
+
+            </div>
+        </div>
+
+        <!-- Save button -->
+        <button id="svimg_button" onclick="save();" class="other_action_buttons other_action_buttons_hover">Save Image</button>
+
+        <!-- Notes on usage button -->
+        <div id="readme_menu" class="sattype_menu">
+        <button id="readme_button" class="other_action_buttons other_action_buttons_hover readme_button">README: Usage Notes</button>
+              <div class="sattype_content readme_toggle">
+                  <table><tr><td nowrap><b>
+
+                    When making a loop, the initial render time will be slower while<br>
+                    the server generates the images.  However, subsequent "Update Plot"<br>
+                    requests should be fast since existing frames in the animation will<br>
+                    not need to be regenerated.<br><br>
+
+                    GOES Geostationary Lightning Mapper (GLM): 4 products available:<br>
+                    1) GOES East flashes (lat/lon points of flash centroids; 10 min sum)<br>
+                    2) GOES West flashes (lat/lon points of flash centroids; 10 min sum)<br>
+                    3) Flash extent density (units: flashes/grid box/10-min): <a target=â€_blankâ€ href="http://rammb.cira.colostate.edu/training/visit/quick_guides/GLM_Quick_Guide_Gridded_Products_June_2018.pdf">Description</a><br>
+                    4) Total optical energy (units: 10<sup>-15</sup>J): <a target=â€_blankâ€ href="http://rammb.cira.colostate.edu/training/visit/quick_guides/GLM_Quick_Guide_AFA_and_TOE_August_2018.pdf">Description</a><br><br>
+
+                    ASCAT details: Passes within 6 hours of the satellite image will be<br>
+                    displayed (if set to "On" in the Display Settings menu in the lower-<br>
+                    left portion of this page). On color-enhanced images, red barbs<br>
+                    indicate locations where the ASCAT quality flags were non-zero<br>
+                    meaning there could be errors in speed or direction at these locations.<br><br>
+
+                    SST details: Reynolds Daily SST (OISST v2.1)
+                    <a target="_blank" href="https://www.ncdc.noaa.gov/oisst">Reference</a><br><br>
+
+                    Don't forget to try out the Measure tool in the left column to see<br>
+                    how far a feature is from your point of interest! (non-loop mode only)<br><br>
+
+                    Please send bug reports, questions, comments to:<br>
+                    <a href="mailto:mattonderlinde@weathernerds.org">mattonderlinde@weathernerds.org</a></b>
+
+                  </td></tr></table>
+              </div>
+        </div>
+
+        <!-- Back to zoom mode button -->
+        <button id="back2zoom" onclick="back2zoom();" class="other_action_buttons" style="visibility: hidden;">Back to Zoom Mode</button>
+      </div>
+    </td></tr>
+    <tr><td>
+      <div id="container">
+        <div id="img_panel">
+          <!-- Session Data (sess_data) format =  image_xsize : image_ysize : upper_left_lat : upper_left_lon : lower_right_lat : lower_right_lon -->
+          <input type="hidden" id="sess_data"  value="752:567:55:-130:20:-60:vis:zoom" />
+          <input type="hidden" id="out_img"    value="wait" />
+        </div>
+
+        <!-- Cursor Lat/Lon text box -->
+        <div id="cursorpos" class="coordinates" style="display: none; white-space: nowrap;">
+          <form name ="show">
+            <input type="text" name="mouseYField" value="0" size="6" width="30" style="text-align:center; border-style:none; font-weight:bold; font-size:12px;">
+            <input type="text" name="mouseXField" value="0" size="6" width="30" style="text-align:center; border-style:none; font-weight:bold; font-size:12px;">
+          </form>
+        </div>
+
+        <!-- Cross section line distance measure tool text box -->
+        <div id="disttool" class="distbox" style="display: none;">
+          <form name ="showdist">
+            <input type="text" name="linedist" value="0" size="50" width="100" style="text-align:center; border-style:none; font-weight:bold; width:275px;">
+          </form>
+        </div>
+        <input type="hidden" id="disttoolindicator" value="no">
+
+        <canvas id="canvas" width="1050" height="830"
+            onmouseover="detectmob(); document.getElementById('disttoolindicator').value = 'yes';"
+            ontouchstart="document.getElementById('disttoolindicator').value = 'yes';"
+            onmouseout="document.getElementById('cursorpos').style.display = 'none'; document.getElementById('disttoolindicator').value = 'no';">
+        </canvas>
+
+      </div>
+
+    <!-- Desktop side-bar ad -->
+    </td><td id="vertAd" style="vertical-align:top;">
+        <center>Advertisement</center>
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+        <div id="verticalAdBar" style="height:800px; width:200px;">
+            <ins class="adsbygoogle"
+                style="display:block"
+                data-ad-client="ca-pub-7637947622363602"
+                data-ad-slot="2962450934"
+                data-ad-format="auto"
+                data-full-width-responsive="true"></ins>
+            <script>
+                function detect_devtype() {
+                    devtype = "desktop";
+                    if ( window.matchMedia("(max-width: 1024px)").matches ) {
+                        devtype = "mobile";
+                    }
+                }
+                detect_devtype();
+                if ( devtype == "desktop" ) {
+                    if ($('#horzAd').length > 0) {
+                        document.getElementById("horzAd").innerHTML = "";
+                    }
+                    (adsbygoogle = window.adsbygoogle || []).push({});
+                } else {
+                    document.getElementById("vertAd").innerHTML = "";
+                }
+            </script>
+        </div>
+    </td></tr>
+
+    <!-- Mobile horizontal ad below graphics -->
+    <tr><td id="horzAd" align="center" style="vertical-align:top;">
+        <!-- <center>Advertisement</center><br> -->
+        <div id="protectAd" style="position:absolute; display:none; height:0px; width:1050px; background: rgba( 255, 255, 255, 0.0 ); z-index:900;"></div>
+        <div id="horizontalAdBar" style="height:0px; width:1000px;">
+            <ins class="adsbygoogle"
+                style="display:block"
+                data-ad-client="ca-pub-7637947622363602"
+                data-ad-slot="9687641384"
+                data-ad-format="auto"
+                data-full-width-responsive="true"></ins>
+            <script>
+                function detect_devtype() {
+                    devtype = "desktop";
+                    if ( window.matchMedia("(max-width: 1024px)").matches ) {
+                        devtype = "mobile";
+                    }
+                }
+                detect_devtype();
+                if ( devtype == "mobile" ) {
+                    if ($('#vertAd').length > 0) {
+                        document.getElementById("vertAd").innerHTML = "";
+                    }
+                    // (adsbygoogle = window.adsbygoogle || []).push({});
+                } else {
+                    document.getElementById("horzAd").innerHTML = "";
+                }
+            </script>
+        </div>
+
+    </td></tr>
+
+    <!-- GOES/Himawari data source credit -->
+    <tr><td style="width: 1050px;" align="justify">
+        <br><b><font class="footer_text">GOES and Himawari data are provided by <a href="https://registry.opendata.aws/noaa-goes/"     target="_blank">NOAA &amp; Amazon</a>
+                                                                               (<a href="https://registry.opendata.aws/noaa-himawari/" target="_blank">Himawari</a>)</font></b>
+    </td></tr>
+
+    <!-- Standard page footer -->
+    <tr><td>
+        <div id="footerDiv"></div>
+    </td></tr>
+
+  </table>
+  </td></tr>
+  </table>
+
+</div>
+
+</td></tr></table>   <!-- Ends table containing entire page -->
+
 </body>
+
+<!-- Make html5 loop function available -->
+<script type="text/javascript" src="/models/v3.0/gfs/javascript/hanis_min.js?202107311900"></script>
+
+<!-- Make sure we only show the mobile zoom notification once -->
+<script type="text/javascript" src="/models/v3.0/gfs/javascript/js.cookie.js"></script>
+
 </html>
