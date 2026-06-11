@@ -50,27 +50,46 @@
       <span id="campo2">...</span>
     </div>
   </div>
+
+  <!-- AQUÍ EMPIEZA EL NUEVO BLOQUE DEFINITIVO -->
   <script>
-    const URL_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRorubWj5Bh_a3PuFp2k2br8k_UsTIcMVVUJgX1IRR1e2e3vT9LeILU-fDyJEz0OAvcWixvksWimowI/pub?gid=0&single=true&output=csv';
+    // Tu ID extraído de la URL que me enviaste antes
+    const SHEET_ID = '1vRorubWj5Bh_a3PuFp2k2br8k_UsTIcMVVUJgX1IRR1e2e3vT9LeILU-fDyJEz0OAvcWixvksWimowI';
+    
+    // Conectamos con el motor de datos en tiempo real de Google
+    const URL_REALTIME = `https://google.com{SHEET_ID}/gviz/tq?tqx=out:json`;
 
     function actualizar() {
-      fetch(URL_CSV + '&t=' + Date.now())
+      fetch(URL_REALTIME + '&v=' + Date.now())
         .then(r => r.text())
-        .then(data => {
-          const filas = data.split('\n');
-          const campo1 = filas[3].split(',')[5] || 'vacío';
-          const campo2 = filas[8].split(',')[2] || 'vacío';
+        .then(text => {
+          // Limpiamos el texto para convertirlo en un objeto JSON limpio
+          const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+          const json = JSON.parse(jsonString);
+          
+          const filas = json.table.rows;
+
+          // Buscamos F4 (Fila 4 es el índice 3. Columna F es la posición 5)
+          const campo1 = filas[3]?.c[5]?.v || 'vacío';
+          
+          // Buscamos C9 (Fila 9 es el índice 8. Columna C es la posición 2)
+          const campo2 = filas[8]?.c[2]?.v || 'vacío';
 
           const el1 = document.getElementById('campo1');
           const el2 = document.getElementById('campo2');
-          if (el1.innerText !== campo1) el1.innerText = campo1;
-          if (el2.innerText !== campo2) el2.innerText = campo2;
+
+          if (el1.innerText !== String(campo1)) el1.innerText = campo1;
+          if (el2.innerText !== String(campo2)) el2.innerText = campo2;
         })
-        .catch(err => console.error('Error:', err));
+        .catch(err => console.error('Error de conexión:', err));
     }
 
+    // Se ejecuta de inmediato al cargar la página
     actualizar();
+    
+    // Se repite cada 10 segundos exactos sin problemas de caché
     setInterval(actualizar, 10000);
   </script>
+  <!-- AQUÍ TERMINA EL NUEVO BLOQUE DEFINITIVO -->
 </body>
 </html>
