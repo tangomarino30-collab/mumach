@@ -55,40 +55,24 @@
   <script>
     // Tu ID extraído de la URL que me enviaste antes
     const SHEET_ID = '1RFr9qIPlEOrYRbW0ESWBH_2PZfDuJg_WnsjD6Nc_C4c';
-    
-    // Conectamos con el motor de datos en tiempo real de Google
-    const URL_REALTIME = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
-    function actualizar() {
-      fetch(URL_REALTIME + '&v=' + Date.now())
-        .then(r => r.text())
-        .then(text => {
-          // Limpiamos el texto para convertirlo en un objeto JSON limpio
-          const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
-          const json = JSON.parse(jsonString);
-          
-          const filas = json.table.rows;
+function leerCelda(celda) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&tq=select%20${celda}&range=${celda}`;
+  return fetch(url)
+    .then(r => r.text())
+    .then(text => {
+      const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+      return json.table.rows[0]?.c[0]?.v || 'vacío';
+    });
+}
 
-          // Buscamos F4 (Fila 4 es el índice 3. Columna F es la posición 5)
-          const campo1 = filas[3]?.c[5]?.v || 'vacío';
-          
-          // Buscamos C9 (Fila 9 es el índice 8. Columna C es la posición 2)
-          const campo2 = filas[8]?.c[2]?.v || 'vacío';
+function actualizar() {
+  leerCelda('F4').then(v => document.getElementById('campo1').innerText = v);
+  leerCelda('C9').then(v => document.getElementById('campo2').innerText = v);
+}
 
-          const el1 = document.getElementById('campo1');
-          const el2 = document.getElementById('campo2');
-
-          if (el1.innerText !== String(campo1)) el1.innerText = campo1;
-          if (el2.innerText !== String(campo2)) el2.innerText = campo2;
-        })
-        .catch(err => console.error('Error de conexión:', err));
-    }
-
-    // Se ejecuta de inmediato al cargar la página
-    actualizar();
-    
-    // Se repite cada 10 segundos exactos sin problemas de caché
-    setInterval(actualizar, 10000);
+actualizar();
+setInterval(actualizar, 10000);
   </script>
   <!-- AQUÍ TERMINA EL NUEVO BLOQUE DEFINITIVO -->
 </body>
