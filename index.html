@@ -14,12 +14,10 @@
       margin: 0;
       background-color: #f0f4f8;
     }
-
     .contenedor {
       display: flex;
       gap: 40px;
     }
-
     .globo {
       background-color: white;
       border-radius: 20px;
@@ -28,14 +26,12 @@
       text-align: center;
       min-width: 150px;
     }
-
     .globo label {
       display: block;
       font-size: 14px;
       color: #888;
       margin-bottom: 10px;
     }
-
     .globo span {
       font-size: 28px;
       font-weight: bold;
@@ -44,7 +40,6 @@
   </style>
 </head>
 <body>
-
   <div class="contenedor">
     <div class="globo">
       <label>Campo 1 (F4)</label>
@@ -55,30 +50,26 @@
       <span id="campo2">...</span>
     </div>
   </div>
-
   <script>
-    const URL_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRorubWj5Bh_a3PuFp2k2br8k_UsTIcMVVUJgX1IRR1e2e3vT9LeILU-fDyJEz0OAvcWixvksWimowI/pub?gid=0&single=true&output=csv';
+    const SHEET_ID = '1RFr9qIPlEOrYRbW0ESWBH_2PZfDuJg_WnsjD6Nc_C4c';
 
-    fetch(URL_CSV)
-      .then(response => response.text())
-      .then(data => {
-        const filas = data.split('\n');
+    function leerCelda(celda) {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&range=${celda}&v=${Date.now()}`;
+      return fetch(url)
+        .then(r => r.text())
+        .then(text => {
+          const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+          return json.table.rows[0]?.c[0]?.v ?? 'vacío';
+        });
+    }
 
-        // F4 = fila 4 (índice 3), columna F (índice 5)
-        const fila4 = filas[3].split(',');
-        const campo1 = fila4[5];
+    function actualizar() {
+      leerCelda('F4').then(v => document.getElementById('campo1').innerText = v);
+      leerCelda('C9').then(v => document.getElementById('campo2').innerText = v);
+    }
 
-        // C9 = fila 9 (índice 8), columna C (índice 2)
-        const fila9 = filas[8].split(',');
-        const campo2 = fila9[2];
-
-        document.getElementById('campo1').innerText = campo1 || 'vacío';
-        document.getElementById('campo2').innerText = campo2 || 'vacío';
-      })
-      .catch(error => {
-        console.error('Error al cargar los datos:', error);
-      });
+    actualizar();
+    setInterval(actualizar, 10000);
   </script>
-
 </body>
 </html>
