@@ -57,7 +57,7 @@
     const SHEET_ID = '1vRorubWj5Bh_a3PuFp2k2br8k_UsTIcMVVUJgX1IRR1e2e3vT9LeILU-fDyJEz0OAvcWixvksWimowI';
     
     // Conectamos con el motor de datos en tiempo real de Google
-    const URL_REALTIME = = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+    const URL_REALTIME = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
     function actualizar() {
       fetch(URL_REALTIME + '&v=' + Date.now())
